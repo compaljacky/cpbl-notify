@@ -1,0 +1,116 @@
+require('dotenv').config();
+const cron = require('node-cron');
+const createWebhookApp = require('./webhook');
+const { fetchGames } = require('./cpbl');
+const { pushLineMessage } = require('./line');
+const { readState, writeState } = require('./state');
+
+function buildScoreKey(game) {
+  return [game.awayScore, game.homeScore].join(':');
+}
+
+function gameSnapshot(game) {
+  return {
+    scoreKey: buildScoreKey(game),
+    status: game.status,
+    awayTeam: game.awayTeam,
+    homeTeam: game.homeTeam,
+    awayScore: game.awayScore,
+    homeScore: game.homeScore,
+    place: game.place,
+    inning: game.inning
+  };
+}
+
+function formatScoreMessage(game) {
+  return [
+    '【中職比分更新】',
+    `${game.awayTeam} ${game.awayScore} : ${game.homeScore} ${game.homeTeam}`,
+    `局數：${game.inning}`,
+    `球場：${game.place}`
+  ].join('\n');
+}
+
+function formatEndMessage(snap) {
+  return [
+    '【中職比賽結束】',
+    `${snap.awayTeam} ${snap.awayScore} : ${snap.homeScore} ${snap.homeTeam}`,
+    `最終比分`,
+    `球場：${snap.place}`
+  ].join('\n');
+}
+
+async function checkScores() {
+  console.log('開始檢查比分...');
+
+  const oldState = readState();
+  const games = await fetchGames();
+  const newState = {};
+
+  for (const game of games) {
+    const snap = gameSnapshot(game);
+    newState[game.gameId] = snap;
+
+    // 只有直播中的場次才做通知判斷
+    if (game.status === '比賽中') {
+      const old = oldState[game.gameId];
+      if (old && old.scoreKey !== snap.scoreKey) {
+        await pushLineMessage(formatScoreMessage(game));
+        console.log(`比分變化通知：${game.gameId}`);
+        snap.lastNotifiedScoreKey = snap.scoreKey;
+      } else {
+        snap.lastNotifiedScoreKey = old?.lastNotifiedScoreKey ?? null;
+      }
+    }
+  }
+
+  // 先把舊 state 中已結束的場次帶入 newState，避免下次輪詢再次觸發結束通知
+  for (const [gameId, oldSnap] of Object.entries(oldState)) {
+    if (oldSnap.finished) {
+      newState[gameId] = oldSnap;
+    }
+  }
+
+  // 原本直播中、現在不見或狀態不是「比賽中」→ 比賽結束，且比分與上次推播不同才通知
+  for (const [gameId, oldSnap] of Object.entries(oldState)) {
+    if (oldSnap.finished) continue;
+    if (oldSnap.status !== '比賽中') continue;
+    const current = newState[gameId];
+    const isStillLive = current && current.status === '比賽中';
+    if (!isStillLive) {
+      const finalSnap = current ?? oldSnap;
+      if (finalSnap.scoreKey !== oldSnap.lastNotifiedScoreKey) {
+        await pushLineMessage(formatEndMessage(finalSnap));
+        console.log(`比賽結束通知：${gameId}`);
+      }
+      newState[gameId] = { ...(current ?? oldSnap), finished: true };
+    }
+  }
+
+  writeState(newState);
+}
+
+async function main() {
+  const app = createWebhookApp();
+  const port = process.env.PORT || 3000;
+
+  app.listen(port, () => {
+    console.log(`Webhook server running at http://localhost:${port}`);
+  });
+
+  try {
+    await checkScores();
+  } catch (err) {
+    console.error('首次檢查失敗：', err.response?.data || err.message);
+  }
+
+  cron.schedule('* * * * *', async () => {
+    try {
+      await checkScores();
+    } catch (err) {
+      console.error('排程檢查失敗：', err.response?.data || err.message);
+    }
+  });
+}
+
+main();
