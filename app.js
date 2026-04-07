@@ -31,6 +31,23 @@ function formatScoreMessage(game) {
   ].join('\n');
 }
 
+function formatSuspendedMessage(snap) {
+  return [
+    '【中職比賽暫停】',
+    `${snap.awayTeam} ${snap.awayScore} : ${snap.homeScore} ${snap.homeTeam}`,
+    `球場：${snap.place}`
+  ].join('\n');
+}
+
+function formatResumedMessage(snap) {
+  return [
+    '【中職比賽恢復】',
+    `${snap.awayTeam} ${snap.awayScore} : ${snap.homeScore} ${snap.homeTeam}`,
+    `局數：${snap.inning}`,
+    `球場：${snap.place}`
+  ].join('\n');
+}
+
 function formatEndMessage(snap) {
   return [
     '【中職比賽結束】',
@@ -51,9 +68,10 @@ async function checkScores() {
     const snap = gameSnapshot(game);
     newState[game.gameId] = snap;
 
-    // 只有直播中的場次才做通知判斷
+    const old = oldState[game.gameId];
+
+    // 比賽中：判斷比分變化
     if (game.status === '比賽中') {
-      const old = oldState[game.gameId];
       if (old && old.scoreKey !== snap.scoreKey) {
         await pushLineMessage(formatScoreMessage(game));
         console.log(`比分變化通知：${game.gameId}`);
@@ -61,6 +79,19 @@ async function checkScores() {
       } else {
         snap.lastNotifiedScoreKey = old?.lastNotifiedScoreKey ?? null;
       }
+    }
+
+    // 比賽暫停：由「比賽中」變成「比賽暫停」才通知
+    if (game.status === '比賽暫停' && old?.status === '比賽中') {
+      await pushLineMessage(formatSuspendedMessage(snap));
+      console.log(`比賽暫停通知：${game.gameId}`);
+      snap.lastNotifiedScoreKey = old?.lastNotifiedScoreKey ?? null;
+    }
+
+    // 比賽恢復：由「比賽暫停」變成「比賽中」才通知
+    if (game.status === '比賽中' && old?.status === '比賽暫停') {
+      await pushLineMessage(formatResumedMessage(game));
+      console.log(`比賽恢復通知：${game.gameId}`);
     }
   }
 
