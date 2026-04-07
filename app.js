@@ -92,6 +92,7 @@ async function checkScores() {
     if (game.status === '比賽中' && old?.status === '比賽暫停') {
       await pushLineMessage(formatResumedMessage(game));
       console.log(`比賽恢復通知：${game.gameId}`);
+      snap.lastNotifiedScoreKey = old?.lastNotifiedScoreKey ?? null;
     }
   }
 
@@ -105,7 +106,7 @@ async function checkScores() {
   // 原本直播中、現在不見或狀態不是「比賽中」→ 比賽結束，且比分與上次推播不同才通知
   for (const [gameId, oldSnap] of Object.entries(oldState)) {
     if (oldSnap.finished) continue;
-    if (oldSnap.status !== '比賽中') continue;
+    if (oldSnap.status !== '比賽中' && oldSnap.status !== '比賽暫停') continue;
     const current = newState[gameId];
     const isStillLive = current && (current.status === '比賽中' || current.status === '比賽暫停');
     if (!isStillLive) {
