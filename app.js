@@ -76,7 +76,7 @@ async function checkScores() {
     if (oldSnap.finished) continue;
     if (oldSnap.status !== '比賽中') continue;
     const current = newState[gameId];
-    const isStillLive = current && current.status === '比賽中';
+    const isStillLive = current && (current.status === '比賽中' || current.status === '比賽暫停');
     if (!isStillLive) {
       const finalSnap = current ?? oldSnap;
       if (finalSnap.scoreKey !== oldSnap.lastNotifiedScoreKey) {
@@ -104,7 +104,7 @@ async function main() {
     console.error('首次檢查失敗：', err.response?.data || err.message);
   }
 
-  cron.schedule('* * * * *', async () => {
+  cron.schedule('*/5 * * * *', async () => {
     try {
       await checkScores();
     } catch (err) {
