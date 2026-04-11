@@ -4,6 +4,7 @@ const createWebhookApp = require('./webhook');
 const { fetchGames } = require('./cpbl');
 const { pushLineMessage } = require('./line');
 const { readState, writeState } = require('./state');
+const logger = require('./logger');
 
 function buildScoreKey(game) {
   return [game.awayScore, game.homeScore].join(':');
@@ -58,10 +59,11 @@ function formatEndMessage(snap) {
 }
 
 async function checkScores() {
-  console.log('開始檢查比分...');
+  logger.log('開始檢查比分...');
 
   const oldState = readState();
   const games = await fetchGames();
+  logger.log(`取得場次數：${games.length}`);
   const newState = {};
 
   for (const game of games) {
@@ -69,12 +71,13 @@ async function checkScores() {
     newState[game.gameId] = snap;
 
     const old = oldState[game.gameId];
+    logger.log(`場次 ${game.gameId}：狀態=${game.status} 比分=${snap.scoreKey} 上次狀態=${old?.status ?? '無'} 上次比分=${old?.scoreKey ?? '無'} 上次通知=${old?.lastNotifiedScoreKey ?? '無'}`);
 
     // 比賽中：判斷比分變化（old.status 也必須是比賽中，避免剛開賽 0:0 誤通知）
     if (game.status === '比賽中') {
       if (old && old.status === '比賽中' && old.scoreKey !== snap.scoreKey) {
         await pushLineMessage(formatScoreMessage(game));
-        console.log(`比分變化通知：${game.gameId}`);
+        logger.log(`比分變化通知：${game.gameId}`);
         snap.lastNotifiedScoreKey = snap.scoreKey;
       } else {
         snap.lastNotifiedScoreKey = old?.lastNotifiedScoreKey ?? null;
@@ -84,14 +87,14 @@ async function checkScores() {
     // 比賽暫停：由「比賽中」變成「比賽暫停」才通知
     if (game.status === '比賽暫停' && old?.status === '比賽中') {
       await pushLineMessage(formatSuspendedMessage(snap));
-      console.log(`比賽暫停通知：${game.gameId}`);
+      logger.log(`比賽暫停通知：${game.gameId}`);
       snap.lastNotifiedScoreKey = old?.lastNotifiedScoreKey ?? null;
     }
 
     // 比賽恢復：由「比賽暫停」變成「比賽中」才通知
     if (game.status === '比賽中' && old?.status === '比賽暫停') {
       await pushLineMessage(formatResumedMessage(game));
-      console.log(`比賽恢復通知：${game.gameId}`);
+      logger.log(`比賽恢復通知：${game.gameId}`);
       snap.lastNotifiedScoreKey = old?.lastNotifiedScoreKey ?? null;
     }
   }
@@ -111,15 +114,19 @@ async function checkScores() {
     const isStillLive = current && (current.status === '比賽中' || current.status === '比賽暫停');
     if (!isStillLive) {
       const finalSnap = current ?? oldSnap;
+      logger.log(`場次 ${gameId} 結束判斷：finalScore=${finalSnap.scoreKey} lastNotified=${oldSnap.lastNotifiedScoreKey ?? '無'}`);
       if (finalSnap.scoreKey !== oldSnap.lastNotifiedScoreKey) {
         await pushLineMessage(formatEndMessage(finalSnap));
-        console.log(`比賽結束通知：${gameId}`);
+        logger.log(`比賽結束通知：${gameId}`);
+      } else {
+        logger.log(`場次 ${gameId} 結束但比分與上次通知相同，略過`);
       }
       newState[gameId] = { ...(current ?? oldSnap), finished: true };
     }
   }
 
   writeState(newState);
+  logger.log('檢查完畢，state 已寫入');
 }
 
 async function main() {
@@ -127,20 +134,20 @@ async function main() {
   const port = process.env.PORT || 3000;
 
   app.listen(port, () => {
-    console.log(`Webhook server running at http://localhost:${port}`);
+    logger.log(`Webhook server running at http://localhost:${port}`);
   });
 
   try {
     await checkScores();
   } catch (err) {
-    console.error('首次檢查失敗：', err.response?.data || err.message);
+    logger.error(`首次檢查失敗：${err.response?.data || err.message}`);
   }
 
   cron.schedule('*/5 * * * *', async () => {
     try {
       await checkScores();
     } catch (err) {
-      console.error('排程檢查失敗：', err.response?.data || err.message);
+      logger.error(`排程檢查失敗：${err.response?.data || err.message}`);
     }
   });
 }
