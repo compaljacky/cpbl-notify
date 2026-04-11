@@ -70,9 +70,9 @@ async function checkScores() {
 
     const old = oldState[game.gameId];
 
-    // 比賽中：判斷比分變化
+    // 比賽中：判斷比分變化（old.status 也必須是比賽中，避免剛開賽 0:0 誤通知）
     if (game.status === '比賽中') {
-      if (old && old.scoreKey !== snap.scoreKey) {
+      if (old && old.status === '比賽中' && old.scoreKey !== snap.scoreKey) {
         await pushLineMessage(formatScoreMessage(game));
         console.log(`比分變化通知：${game.gameId}`);
         snap.lastNotifiedScoreKey = snap.scoreKey;
