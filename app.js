@@ -116,12 +116,8 @@ async function checkScores() {
     if (!isStillLive) {
       const finalSnap = current ?? oldSnap;
       logger.log(`場次 ${gameId} 結束判斷：finalScore=${finalSnap.scoreKey} lastNotified=${oldSnap.lastNotifiedScoreKey ?? '無'}`);
-      if (finalSnap.scoreKey !== oldSnap.lastNotifiedScoreKey) {
-        messages.push(formatEndMessage(finalSnap));
-        logger.log(`比賽結束通知：${gameId}`);
-      } else {
-        logger.log(`場次 ${gameId} 結束但比分與上次通知相同，略過`);
-      }
+      messages.push(formatEndMessage(finalSnap));
+      logger.log(`比賽結束通知：${gameId}`);
       newState[gameId] = { ...(current ?? oldSnap), finished: true };
     }
   }
