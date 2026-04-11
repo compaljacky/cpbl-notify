@@ -23,9 +23,8 @@ function gameSnapshot(game) {
   };
 }
 
-function formatScoreMessage(game) {
+function formatScoreEntry(game) {
   return [
-    '【中職比分更新】',
     `${game.awayTeam} ${game.awayScore} : ${game.homeScore} ${game.homeTeam}`,
     `局數：${game.inning}`,
     `球場：${game.place}`
@@ -65,6 +64,7 @@ async function checkScores() {
   const games = await fetchGames();
   logger.log(`取得場次數：${games.length}`);
   const newState = {};
+  const scoreEntries = [];
   const messages = [];
 
   for (const game of games) {
@@ -77,7 +77,7 @@ async function checkScores() {
     // 比賽中：判斷比分變化（old.status 也必須是比賽中，避免剛開賽 0:0 誤通知）
     if (game.status === '比賽中') {
       if (old && old.status === '比賽中' && old.scoreKey !== snap.scoreKey) {
-        messages.push(formatScoreMessage(game));
+        scoreEntries.push(formatScoreEntry(game));
         logger.log(`比分變化通知：${game.gameId}`);
         snap.lastNotifiedScoreKey = snap.scoreKey;
       } else {
@@ -120,6 +120,10 @@ async function checkScores() {
       logger.log(`比賽結束通知：${gameId}`);
       newState[gameId] = { ...(current ?? oldSnap), finished: true };
     }
+  }
+
+  if (scoreEntries.length > 0) {
+    messages.unshift('【中職比分更新】\n' + scoreEntries.join('\n\n'));
   }
 
   if (messages.length > 0) {
