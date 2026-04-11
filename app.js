@@ -65,6 +65,7 @@ async function checkScores() {
   const games = await fetchGames();
   logger.log(`取得場次數：${games.length}`);
   const newState = {};
+  const messages = [];
 
   for (const game of games) {
     const snap = gameSnapshot(game);
@@ -76,7 +77,7 @@ async function checkScores() {
     // 比賽中：判斷比分變化（old.status 也必須是比賽中，避免剛開賽 0:0 誤通知）
     if (game.status === '比賽中') {
       if (old && old.status === '比賽中' && old.scoreKey !== snap.scoreKey) {
-        await pushLineMessage(formatScoreMessage(game));
+        messages.push(formatScoreMessage(game));
         logger.log(`比分變化通知：${game.gameId}`);
         snap.lastNotifiedScoreKey = snap.scoreKey;
       } else {
@@ -86,14 +87,14 @@ async function checkScores() {
 
     // 比賽暫停：由「比賽中」變成「比賽暫停」才通知
     if (game.status === '比賽暫停' && old?.status === '比賽中') {
-      await pushLineMessage(formatSuspendedMessage(snap));
+      messages.push(formatSuspendedMessage(snap));
       logger.log(`比賽暫停通知：${game.gameId}`);
       snap.lastNotifiedScoreKey = old?.lastNotifiedScoreKey ?? null;
     }
 
     // 比賽恢復：由「比賽暫停」變成「比賽中」才通知
     if (game.status === '比賽中' && old?.status === '比賽暫停') {
-      await pushLineMessage(formatResumedMessage(game));
+      messages.push(formatResumedMessage(game));
       logger.log(`比賽恢復通知：${game.gameId}`);
       snap.lastNotifiedScoreKey = old?.lastNotifiedScoreKey ?? null;
     }
@@ -116,13 +117,18 @@ async function checkScores() {
       const finalSnap = current ?? oldSnap;
       logger.log(`場次 ${gameId} 結束判斷：finalScore=${finalSnap.scoreKey} lastNotified=${oldSnap.lastNotifiedScoreKey ?? '無'}`);
       if (finalSnap.scoreKey !== oldSnap.lastNotifiedScoreKey) {
-        await pushLineMessage(formatEndMessage(finalSnap));
+        messages.push(formatEndMessage(finalSnap));
         logger.log(`比賽結束通知：${gameId}`);
       } else {
         logger.log(`場次 ${gameId} 結束但比分與上次通知相同，略過`);
       }
       newState[gameId] = { ...(current ?? oldSnap), finished: true };
     }
+  }
+
+  if (messages.length > 0) {
+    await pushLineMessage(messages.join('\n\n'));
+    logger.log(`推播 ${messages.length} 則訊息（合併發送）`);
   }
 
   writeState(newState);
