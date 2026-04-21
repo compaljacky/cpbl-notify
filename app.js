@@ -2,7 +2,7 @@ require('dotenv').config();
 const cron = require('node-cron');
 const createWebhookApp = require('./webhook');
 const { fetchGames } = require('./cpbl');
-const { pushLineMessage } = require('./line');
+const { pushDiscordMessage } = require('./discord');
 const { readState, writeState } = require('./state');
 const logger = require('./logger');
 
@@ -127,7 +127,7 @@ async function checkScores() {
   }
 
   if (messages.length > 0) {
-    await pushLineMessage(messages.join('\n\n'));
+    await pushDiscordMessage(messages.join('\n\n'));
     logger.log(`推播 ${messages.length} 則訊息（合併發送）`);
   }
 
@@ -149,7 +149,7 @@ async function main() {
     logger.error(`首次檢查失敗：${err.response?.data || err.message}`);
   }
 
-  cron.schedule('*/5 * * * *', async () => {
+  cron.schedule('* * * * *', async () => {
     try {
       await checkScores();
     } catch (err) {
