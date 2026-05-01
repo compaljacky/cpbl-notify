@@ -127,7 +127,7 @@ async function checkScores() {
 
       if (hasChanged(previousState[game.id], game)) {
         const message = [
-          '【中職比分更新】',
+          '【比分更新】',
           `場次：${game.id}`,
           `狀態：${game.status}`,
           game.rawText

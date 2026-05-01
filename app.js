@@ -32,7 +32,7 @@ function formatScoreEntry(game) {
 
 function formatSuspendedMessage(snap) {
   return [
-    '【中職比賽暫停】',
+    '【比賽暫停】',
     `${snap.awayTeam} ${snap.awayScore} : ${snap.homeScore} ${snap.homeTeam}`,
     `球場：${snap.place}`
   ].join('\n');
@@ -40,7 +40,7 @@ function formatSuspendedMessage(snap) {
 
 function formatResumedMessage(snap) {
   return [
-    '【中職比賽恢復】',
+    '【比賽恢復】',
     `${snap.awayTeam} ${snap.awayScore} : ${snap.homeScore} ${snap.homeTeam}`,
     `局數：${snap.inning}`,
     `球場：${snap.place}`
@@ -49,7 +49,7 @@ function formatResumedMessage(snap) {
 
 function formatEndMessage(snap) {
   return [
-    '【中職比賽結束】',
+    '【比賽結束】',
     `${snap.awayTeam} ${snap.awayScore} : ${snap.homeScore} ${snap.homeTeam}`,
     `最終比分`,
     `球場：${snap.place}`
@@ -122,7 +122,7 @@ async function checkScores() {
   }
 
   if (scoreEntries.length > 0) {
-    messages.unshift('【中職比分更新】\n' + scoreEntries.join('\n\n'));
+    messages.unshift('【比分更新】\n' + scoreEntries.join('\n\n'));
   }
 
   if (messages.length > 0) {
