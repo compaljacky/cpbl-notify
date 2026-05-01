@@ -1,5 +1,4 @@
 require('dotenv').config();
-const cron = require('node-cron');
 const createWebhookApp = require('./webhook');
 const { fetchGames } = require('./cpbl');
 const { pushDiscordMessage } = require('./discord');
@@ -149,13 +148,19 @@ async function main() {
     logger.error(`首次檢查失敗：${err.response?.data || err.message}`);
   }
 
-  cron.schedule('* * * * *', async () => {
-    try {
-      await checkScores();
-    } catch (err) {
-      logger.error(`排程檢查失敗：${err.response?.data || err.message}`);
-    }
-  });
+  const scheduleNext = () => {
+    const delay = 5 + Math.floor(Math.random() * 5); // 5~10 分鐘
+    logger.log(`下次檢查將於 ${delay} 分鐘後執行`);
+    setTimeout(async () => {
+      try {
+        await checkScores();
+      } catch (err) {
+        logger.error(`排程檢查失敗：${err.response?.data || err.message}`);
+      }
+      scheduleNext();
+    }, delay * 60 * 1000);
+  };
+  scheduleNext();
 }
 
 main();
