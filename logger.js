@@ -20,13 +20,15 @@ function ensureLogsDir() {
 }
 
 function log(message) {
-  console.log(message);
+  const ts = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+  console.log(`[${ts}] ${message}`);
   ensureLogsDir();
   fs.appendFileSync(getLogPath(), formatLine('INFO', message), 'utf8');
 }
 
 function error(message) {
-  console.error(message);
+  const ts = new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+  console.error(`[${ts}] ${message}`);
   ensureLogsDir();
   fs.appendFileSync(getLogPath(), formatLine('ERROR', message), 'utf8');
 }
