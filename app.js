@@ -63,8 +63,12 @@ async function checkScores() {
   const games = await fetchGames();
   logger.log(`取得場次數：${games.length}`);
   const newState = {};
-  const scoreEntries = [];
-  const messages = [];
+  const perGameMessages = {}; // gameId -> string[]
+
+  function addGameMessage(gameId, msg) {
+    if (!perGameMessages[gameId]) perGameMessages[gameId] = [];
+    perGameMessages[gameId].push(msg);
+  }
 
   for (const game of games) {
     const snap = gameSnapshot(game);
@@ -76,7 +80,7 @@ async function checkScores() {
     // 比賽中：判斷比分變化（old.status 也必須是比賽中，避免剛開賽 0:0 誤通知）
     if (game.status === '比賽中') {
       if (old && old.status === '比賽中' && old.scoreKey !== snap.scoreKey) {
-        scoreEntries.push(formatScoreEntry(game));
+        addGameMessage(game.gameId, '【比分更新】\n' + formatScoreEntry(game));
         logger.log(`比分變化通知：${game.gameId}`);
         snap.lastNotifiedScoreKey = snap.scoreKey;
       } else {
@@ -86,14 +90,14 @@ async function checkScores() {
 
     // 比賽暫停：由「比賽中」變成「比賽暫停」才通知
     if (game.status === '比賽暫停' && old?.status === '比賽中') {
-      messages.push(formatSuspendedMessage(snap));
+      addGameMessage(game.gameId, formatSuspendedMessage(snap));
       logger.log(`比賽暫停通知：${game.gameId}`);
       snap.lastNotifiedScoreKey = old?.lastNotifiedScoreKey ?? null;
     }
 
     // 比賽恢復：由「比賽暫停」變成「比賽中」才通知
     if (game.status === '比賽中' && old?.status === '比賽暫停') {
-      messages.push(formatResumedMessage(game));
+      addGameMessage(game.gameId, formatResumedMessage(game));
       logger.log(`比賽恢復通知：${game.gameId}`);
       snap.lastNotifiedScoreKey = old?.lastNotifiedScoreKey ?? null;
     }
@@ -115,19 +119,17 @@ async function checkScores() {
     if (!isStillLive) {
       const finalSnap = current ?? oldSnap;
       logger.log(`場次 ${gameId} 結束判斷：finalScore=${finalSnap.scoreKey} lastNotified=${oldSnap.lastNotifiedScoreKey ?? '無'}`);
-      messages.push(formatEndMessage(finalSnap));
+      addGameMessage(gameId, formatEndMessage(finalSnap));
       logger.log(`比賽結束通知：${gameId}`);
       newState[gameId] = { ...(current ?? oldSnap), finished: true };
     }
   }
 
-  if (scoreEntries.length > 0) {
-    messages.unshift('【比分更新】\n' + scoreEntries.join('\n\n'));
-  }
-
-  if (messages.length > 0) {
-    await pushDiscordMessage(messages.join('\n\n'));
-    logger.log(`推播 ${messages.length} 則訊息（合併發送）`);
+  for (const [gameId, msgs] of Object.entries(perGameMessages)) {
+    if (msgs.length > 0) {
+      await pushDiscordMessage(msgs.join('\n\n'));
+      logger.log(`推播場次 ${gameId}（${msgs.length} 則訊息）`);
+    }
   }
 
   writeState(newState);
