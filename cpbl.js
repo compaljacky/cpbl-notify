@@ -1,91 +1,66 @@
-const { chromium } = require('playwright');
+const axios = require('axios');
 
-function normalizeText(text) {
-  return String(text || '').replace(/\s+/g, ' ').trim();
+// 透過 Cloudflare Worker relay 拿 CPBL 比分（繞過 GCP 機房 IP 被擋的問題）。
+// relay 回傳 CPBL 原始 JSON：{ Success, GameADetailJson: "<字串化的場次陣列>" }
+
+const STATUS_MAP = {
+  1: '比賽未開始',
+  2: '比賽中',
+  3: '比賽結束',
+  6: '延賽'
+};
+
+function mapStatus(g) {
+  // 暫停：比賽中(2) 但 IsGameStop 為 1
+  if (g.GameStatus === 2 && String(g.IsGameStop) === '1') return '比賽暫停';
+  return STATUS_MAP[g.GameStatus] || String(g.GameStatus);
+}
+
+function scoreStr(v) {
+  return v === null || v === undefined ? '' : String(v);
+}
+
+function inningStr(g) {
+  const c = g.CurtBatting;
+  if (!c || !c.InningSeq) return '';
+  // VisitingHomeType: 1=客隊打擊(上半局)、2=主隊打擊(下半局)
+  const half =
+    String(c.VisitingHomeType) === '1'
+      ? '上'
+      : String(c.VisitingHomeType) === '2'
+      ? '下'
+      : '';
+  return `${c.InningSeq}局${half}`;
 }
 
 async function fetchGames() {
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    viewport: { width: 1440, height: 900 }
+  const url = process.env.CPBL_RELAY_URL;
+  const key = process.env.CPBL_RELAY_KEY;
+  if (!url) throw new Error('CPBL_RELAY_URL 未設定');
+
+  const resp = await axios.get(url, {
+    params: { key },
+    timeout: 30000
   });
-  await page.setExtraHTTPHeaders({
-    'Accept-Language': 'zh-TW,zh;q=0.9'
-  });
 
-  try {
-    await page.goto(process.env.CPBL_URL, {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000
-    });
-
-    // 等目標容器出現，最多 15 秒；若今天沒有直播場次則容器不存在，直接繼續
-    await page.waitForSelector('.IndexScheduleList.major', { timeout: 15000 }).catch(() => {});
-
-    const games = await page.evaluate(() => {
-      const cards = Array.from(
-        document.querySelectorAll('.IndexScheduleList.major .game_item')
-      );
-
-      return cards.map((card) => {
-        const gameId =
-          card.querySelector('.tag.game_no a')?.textContent?.trim() || '';
-
-        const status =
-          card.querySelector('.tag.game_status span')?.textContent?.trim() || '';
-
-        const awayTeam =
-          card.querySelector('.team.away .team_name a')?.getAttribute('title') ||
-          card.querySelector('.team.away .team_name a')?.textContent?.trim() ||
-          '';
-
-        const homeTeam =
-          card.querySelector('.team.home .team_name a')?.getAttribute('title') ||
-          card.querySelector('.team.home .team_name a')?.textContent?.trim() ||
-          '';
-
-        const awayScore =
-          card.querySelector('.score .num.away')?.textContent?.trim() || '';
-
-        const homeScore =
-          card.querySelector('.score .num.home')?.textContent?.trim() || '';
-
-        const place =
-          card.querySelector('.score .place')?.textContent?.trim() ||
-          card.querySelector('.PlaceInfo .place')?.textContent?.trim() ||
-          '';
-
-        const inningEl = card.querySelector('.GameMatchupBasic .inning');
-        const inningNum = inningEl?.textContent?.trim() || '';
-        const inningHalf = inningEl?.classList.contains('bot') ? '下' : inningEl?.classList.contains('top') ? '上' : '';
-        const inning = inningNum ? `${inningNum}局${inningHalf}` : '';
-
-        return {
-          gameId,
-          status,
-          awayTeam,
-          homeTeam,
-          awayScore,
-          homeScore,
-          place,
-          inning
-        };
-      });
-    });
-
-    return games.map((game) => ({
-      ...game,
-      status: normalizeText(game.status),
-      awayTeam: normalizeText(game.awayTeam),
-      homeTeam: normalizeText(game.homeTeam),
-      awayScore: normalizeText(game.awayScore),
-      homeScore: normalizeText(game.homeScore),
-      place: normalizeText(game.place)
-    }));
-  } finally {
-    await browser.close();
+  if (!resp.data || resp.data.Success !== true) {
+    throw new Error(
+      'relay 回傳異常：' + JSON.stringify(resp.data).slice(0, 200)
+    );
   }
+
+  const games = JSON.parse(resp.data.GameADetailJson || '[]');
+
+  return games.map((g) => ({
+    gameId: String(g.GameSno),
+    status: mapStatus(g),
+    awayTeam: g.VisitingTeamName || '',
+    homeTeam: g.HomeTeamName || '',
+    awayScore: scoreStr(g.VisitingTotalScore),
+    homeScore: scoreStr(g.HomeTotalScore),
+    place: g.FieldAbbe || '',
+    inning: inningStr(g)
+  }));
 }
 
 module.exports = {
