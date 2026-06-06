@@ -5,6 +5,14 @@ const { pushDiscordMessage } = require('./discord');
 const { readState, writeState } = require('./state');
 const logger = require('./logger');
 
+function formatErr(err) {
+  const data = err.response?.data;
+  if (data !== undefined && data !== null) {
+    return typeof data === 'string' ? data : JSON.stringify(data);
+  }
+  return err.message;
+}
+
 function buildScoreKey(game) {
   return [game.awayScore, game.homeScore].join(':');
 }
@@ -164,7 +172,7 @@ async function main() {
   try {
     await checkScores();
   } catch (err) {
-    logger.error(`首次檢查失敗：${err.response?.data || err.message}`);
+    logger.error(`首次檢查失敗：${formatErr(err)}`);
   }
 
   const scheduleNext = () => {
@@ -174,7 +182,7 @@ async function main() {
       try {
         await checkScores();
       } catch (err) {
-        logger.error(`排程檢查失敗：${err.response?.data || err.message}`);
+        logger.error(`排程檢查失敗：${formatErr(err)}`);
       }
       scheduleNext();
     }, delay * 60 * 1000);
