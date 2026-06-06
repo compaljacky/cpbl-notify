@@ -2,3 +2,8 @@ node_modules
 .env
 cpbl-state.json
 logs/
+.DS_Store
+**/.DS_Store
+
+# 已棄用的 Cloudflare relay（含寫死的 RELAY_KEY，勿進公開 repo）
+worker/

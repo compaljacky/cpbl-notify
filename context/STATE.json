@@ -1,0 +1,103 @@
+{
+  "schema_version": "1.2",
+  "team": {
+    "name": "cpbl-score-bot",
+    "facilitator": "jacky",
+    "scale": "small",
+    "cadence": "彈性 / 隨時（個人專案，依需求開 round-table）",
+    "members": [
+      {
+        "name": "jacky",
+        "role": "engineer",
+        "expertise": ["nodejs", "web-scraping", "playwright", "bot", "express"],
+        "weekly_capacity_hours": 10,
+        "timezone": "Asia/Taipei"
+      }
+    ]
+  },
+  "current_phase": "T0",
+  "active_sync_session": null,
+  "sync_queue": [
+    {
+      "_comment": "v1.1：每筆 sync_queue 條目應有 scope 欄位，決定走 round-table 還是 lightweight-sync",
+      "_example_topic": "（範例條目，使用時請刪除整個 _comment 物件）",
+      "_example_scope": "lightweight",
+      "_example_proposer": "Alice",
+      "_example_submitted_at": "YYYY-MM-DD HH:MM",
+      "_example_wait_days": 0,
+      "_example_affected_roles": ["engineer", "designer"]
+    }
+  ],
+  "active_individual_focuses": [],
+  "capacity_health": {
+    "team_pct": 0,
+    "team_status": "green",
+    "consecutive_red_weeks": 0,
+    "individuals_in_red": [],
+    "ai_assist_pct_avg": 0,
+    "last_updated": null
+  },
+  "weekly_cadence": {
+    "this_week_release": null,
+    "this_week_release_status": null,
+    "consecutive_no_release_weeks": 0,
+    "next_full_retro": null,
+    "weeks_since_last_full_retro": 0
+  },
+  "design_review_board": {
+    "pending": 0,
+    "in_review": 0,
+    "approved_this_week": 0,
+    "blocked": 0
+  },
+  "round_table_count_this_week": 0,
+  "mob_session_count_this_week": 0,
+  "subagent_states": {
+    "pm": "idle",
+    "product": "idle",
+    "engineer": "idle",
+    "designer": "idle",
+    "sre": "idle",
+    "tech-lead": "idle",
+    "design-lead": "idle",
+    "qa": "idle",
+    "planner": "idle",
+    "critic": "idle",
+    "debugger": "idle",
+    "db_expert": "idle",
+    "vuln_verifier": "idle"
+  },
+  "active_lens": null,
+  "last_release": {
+    "version": null,
+    "date": null
+  },
+  "current_version_target": {
+    "version": "v1.0.0",
+    "spec_path": null,
+    "ac_total": 0,
+    "ac_done": 0,
+    "estimated_release": null
+  },
+  "metrics_snapshot": {
+    "north_star_metric": null,
+    "north_star_value": null,
+    "secondary_metrics": {},
+    "last_updated": null
+  },
+  "active_explorations": [],
+  "promoted_explorations_count": 0,
+  "archived_explorations_count": 0,
+  "last_session": {
+    "date": "2026-06-06",
+    "type": "individual",
+    "actor": "jacky",
+    "duration_hours": 0,
+    "ai_assist_hours": 0,
+    "ai_pct": 0,
+    "critic_result": "not-run",
+    "branch": "master",
+    "actions_summary": ["T0 團隊初始化（solo / 彈性節奏）", "填寫 ARCHITECTURE 技術架構"],
+    "left_off_at": "T0 初始化完成，待開第一場 round-table 或進入個人軌實作"
+  }
+}
