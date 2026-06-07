@@ -118,32 +118,34 @@ async function checkScores() {
     }
   }
 
-  // 原本直播中、現在不見或狀態不是「比賽中」→ 疑似比賽結束，需二次確認才通知
-  // 避免網站短暫異常（場次消失或狀態誤報）造成誤判
+  // 比賽結束判定：只有「狀態明確變成比賽結束(FT)」或「整場從列表消失」才算疑似結束，
+  // 並需二次輪詢確認才通知。雨停/中斷(比賽暫停)、延賽、取消都「不算結束」，
+  // 避免把中途中斷或延賽的場次凍結比分誤報成最終結果。
   for (const [gameId, oldSnap] of Object.entries(oldState)) {
     if (oldSnap.finished) continue;
 
     const current = newState[gameId];
-    const isStillLive = current && (current.status === '比賽中' || current.status === '比賽暫停');
+    const looksEnded = !current || current.status === '比賽結束';
+    const wasLive = oldSnap.status === '比賽中' || oldSnap.status === '比賽暫停';
 
     // 上次輪詢已標記疑似結束，本次進行二次確認
     if (oldSnap.pendingEnd) {
-      if (!isStillLive) {
+      if (looksEnded) {
         const finalSnap = current ?? oldSnap;
         logger.log(`場次 ${gameId} 結束確認（二次驗證）：finalScore=${finalSnap.scoreKey}`);
         addGameMessage(gameId, formatEndMessage(finalSnap));
         logger.log(`比賽結束通知：${gameId}`);
         newState[gameId] = { ...(current ?? oldSnap), finished: true };
       } else {
-        logger.log(`場次 ${gameId} 結束誤判，比賽仍在進行中，清除暫定結束標記`);
-        newState[gameId].pendingEnd = false;
+        logger.log(`場次 ${gameId} 結束誤判，比賽尚未結束（狀態=${current?.status ?? '消失'}），清除暫定結束標記`);
+        if (newState[gameId]) newState[gameId].pendingEnd = false;
       }
       continue;
     }
 
-    if (oldSnap.status !== '比賽中' && oldSnap.status !== '比賽暫停') continue;
+    if (!wasLive) continue;
 
-    if (!isStillLive) {
+    if (looksEnded) {
       const finalSnap = current ?? oldSnap;
       logger.log(`場次 ${gameId} 疑似結束，等待下次輪詢確認：score=${finalSnap.scoreKey}`);
       newState[gameId] = { ...(current ?? oldSnap), pendingEnd: true };

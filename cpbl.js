@@ -21,11 +21,11 @@ function mapStatus(g) {
   if (s === 'NS') return '比賽未開始';
   if (s === 'POST') return '延賽'; // 整場賽前延賽（非中途暫停）
   if (s === 'CANC') return '取消';
-  // 中途中斷（如雨停、保留比賽）。atplayer 此源平時看不到這兩碼，
-  // 真的遇到才會出現；app.js 僅在「比賽中→比賽暫停」時才推暫停通知，
-  // 賽前的 POST/NS 不會誤觸發。若日後出現別的中斷碼，app.js 的逐場
-  // log 會印出原始狀態，據此再補映射即可。
-  if (s === 'SUSP' || s === 'INT') return '比賽暫停';
+  // 中途中斷（如雨停、保留比賽）。實際出現過的碼：SUSP、INT、INTR(Interrupted)。
+  // 用前綴比對涵蓋這些變體，全部歸為「比賽暫停」——這樣 app.js 不會把雨停誤判成結束，
+  // 且會正確推「比賽暫停 / 比賽恢復」通知。注意此判斷必須在下面 /^IN/ 之前，
+  // 否則 INTR 會被 /^IN/ 先吃掉誤判成比賽中（IN1..IN9 第三碼是數字，不會誤中 /^INT/）。
+  if (/^(SUSP|INT)/.test(s)) return '比賽暫停';
   if (/^IN/.test(s)) return '比賽中'; // IN1..IN9（含延長）= 進行中
   return g.status_long || s;
 }
